@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBGVDO - Video Editing Invoice Generator</title>
+
+    <!-- Google Font: Anek Odia -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anek+Odia:wght@100..800&display=swap" rel="stylesheet">
+    
+    <!-- External Libraries for Downloading -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #5d3eff; --dark-purple: #2C204A; --light-purple-bg: #F9F7FD;
+            --header-bg: #EBE6F6; --border-color: #e0e0e0; --text-color: #555;
+            --white-color: #ffffff; --font-family: 'Anek Odia', sans-serif;
+            --success-color: #28a745; --danger-color: #dc3545;
+        }
+        body {
+            font-family: var(--font-family); background-color: #f4f7fc; margin: 0;
+            padding: 20px; display: flex; gap: 30px; justify-content: center; flex-wrap: wrap;
+        }
+        .controls {
+            width: 480px; background: var(--white-color); padding: 25px;
+            border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); height: fit-content;
+        }
+        .controls h2, .controls h3 {
+            margin-top: 0; color: var(--dark-purple); border-bottom: 2px solid var(--header-bg);
+            padding-bottom: 10px; margin-bottom: 15px;
+        }
+        .control-group { margin-bottom: 15px; }
+        .controls label {
+            display: block; margin-bottom: 5px; font-weight: 600;
+            font-size: 14px; color: var(--dark-purple);
+        }
+        .controls input[type="text"], .controls input[type="email"], .controls input[type="date"],
+        .controls input[type="number"], .controls textarea, .controls select {
+            width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 5px;
+            box-sizing: border-box; font-family: var(--font-family); transition: border-color 0.3s;
+            font-size: 14px; background-color: var(--white-color);
+        }
+        .controls input:focus, .controls textarea:focus, .controls select:focus {
+            border-color: var(--primary-color); outline: none;
+        }
+        .controls input:disabled { background-color: #f3f4f6; cursor: not-allowed; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        #items-container .item-row {
+            display: grid; grid-template-columns: 5fr 1fr 2fr 0.5fr; gap: 8px;
+            align-items: center; margin-bottom: 10px;
+        }
+        #items-container .item-row .remove-item-btn {
+            background: #ff4d4d; color: white; border: none; border-radius: 50%;
+            width: 25px; height: 25px; font-weight: bold; cursor: pointer;
+            text-align: center; line-height: 25px;
+        }
+        .button-group { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .btn {
+            flex-grow: 1; padding: 12px; border: none; border-radius: 5px; color: var(--white-color);
+            font-weight: 600; cursor: pointer; transition: background-color 0.3s, transform 0.2s;
+            font-family: var(--font-family); font-size: 15px;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { background-color: #ccc; cursor: not-allowed; }
+        #add-item-btn { background-color: var(--success-color); }
+        #download-png-btn { background-color: #007bff; }
+        #download-pdf-btn { background-color: var(--danger-color); }
+        #download-bilingual-pdf-btn { background-color: var(--primary-color); }
+        #lang-toggle-btn { background-color: #6c757d; }
+        
+        /* --- Invoice Preview Styling --- */
+        #invoice-preview-container { width: 800px; position: relative; }
+        #invoice-preview {
+            width: 100%; min-height: 1131px; background: var(--white-color); padding: 40px;
+            box-sizing: border-box; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            color: var(--dark-purple); position: relative; overflow: hidden;
+        }
+        #paid-stamp {
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 100px; font-weight: 800; color: var(--success-color);
+            border: 10px solid var(--success-color); padding: 10px 30px; border-radius: 15px;
+            opacity: 0.2; z-index: 10; display: none; /* Hidden by default */
+        }
+        .invoice-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 2px solid var(--header-bg); padding-bottom: 20px;
+        }
+        .logo-container img { width: 180px; }
+        .invoice-title-section { text-align: right; }
+        .invoice-title { font-size: 56px; font-weight: 800; color: var(--dark-purple); margin: 0; }
+        .company-details p { margin: 2px 0; font-size: 14px; }
+        #preview-gstin-container { display: none; } /* Hidden by default */
+        .billing-info { display: flex; justify-content: space-between; margin-top: 30px; }
+        .billing-info h4 {
+            margin: 0 0 8px 0; font-weight: 700;
+            border-bottom: 1px solid var(--border-color); padding-bottom: 5px;
+        }
+        .billing-info p { margin: 2px 0; font-size: 14px; }
+        .billing-info .client-info { text-align: right; }
+        .invoice-meta { text-align: right; margin: 10px 0 30px 0; }
+        .invoice-meta p { margin: 2px 0; font-size: 14px; }
+        .invoice-meta p span { font-weight: 600; }
+        .items-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .items-table th, .items-table td {
+            text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);
+        }
+        .items-table th { background-color: var(--header-bg); font-weight: 700; }
+        .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 5%; text-align: center; }
+        .items-table th:nth-child(2) { width: 50%; }
+        .items-table th:nth-child(3), .items-table th:nth-child(4), .items-table th:nth-child(5) { 
+            width: 15%; text-align: right;
+        }
+        .items-table td:nth-child(3), .items-table td:nth-child(4), .items-table td:nth-child(5) { 
+            text-align: right;
+        }
+        .invoice-summary { display: flex; justify-content: space-between; margin-top: 30px; align-items: flex-start; }
+        .payment-terms { width: 60%; }
+        .payment-terms h4 { margin: 0 0 10px 0; font-weight: 700; }
+        .payment-terms p { font-size: 13px; margin: 0 0 8px 0; }
+        .payment-terms ul { font-size: 12px; padding-left: 20px; margin: 0; line-height: 1.6; }
+        .totals-section { width: 35%; }
+        .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 15px; }
+        .total-row.grand-total {
+            font-size: 22px; font-weight: 700; border-top: 2px solid var(--dark-purple);
+            margin-top: 5px; padding-top: 10px;
+        }
+        #amount-in-words { font-size: 13px; font-style: italic; margin-top: 15px; }
+        .invoice-footer {
+            margin-top: 40px; text-align: center; font-size: 14px; border-top: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+        #preview-ig-link { color: var(--primary-color); text-decoration: none; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+             <h2 data-lang="formTitle">Invoice Details</h2>
+             <button id="lang-toggle-btn" class="btn" style="padding: 8px 15px; flex-grow: 0;">Odia</button>
+        </div>
+        
+        <h3 data-lang="yourDetails">Your Details</h3>
+        <div class="control-group">
+            <label data-lang="yourName">Name/Company</label><input type="text" id="your-name" value="sbgvdo">
+            <label data-lang="yourAddress">Address</label><input type="text" id="your-address" placeholder="City, Country">
+            <label data-lang="yourPhone">Phone</label><input type="text" id="your-phone">
+            <label data-lang="yourEmail">Email</label><input type="email" id="your-email">
+            <div class="checkbox-group">
+                <input type="checkbox" id="enable-gstin"><label for="enable-gstin" data-lang="yourGstinCheckbox">Enable GSTIN</label>
+            </div>
+            <input type="text" id="your-gstin" placeholder="GSTIN" disabled>
+        </div>
+        
+        <h3 data-lang="clientDetails">Client Details</h3>
+        <div class="control-group">
+            <label data-lang="clientName">Name</label><input type="text" id="client-name">
+            <label data-lang="clientAddress">Address</label><input type="text" id="client-address" placeholder="Client Address">
+            <label data-lang="clientPhone">Phone</label><input type="text" id="client-phone">
+            <label data-lang="clientEmail">Email</label><input type="email" id="client-email">
+        </div>
+
+        <h3 data-lang="invoiceDetails">Invoice Details</h3>
+        <div class="control-group">
+            <label data-lang="invoiceId">Invoice No</label><input type="text" id="invoice-id">
+            <div class="checkbox-group">
+                 <input type="checkbox" id="auto-increment-inv"><label for="auto-increment-inv" data-lang="autoIncrement">Auto-increment invoice # on new session</label>
+            </div>
+            <label data-lang="invoiceDate">Date</label><input type="date" id="invoice-date">
+            <label data-lang="dueDate">Due Date</label><input type="date" id="due-date">
+        </div>
+        
+        <h3 data-lang="items">Items</h3>
+        <div class="control-group">
+            <div id="items-container"></div>
+            <button id="add-item-btn" class="btn" data-lang="addItem">Add Item</button>
+        </div>
+
+        <h3 data-lang="paymentDetails">Payment Details</h3>
+        <div class="control-group">
+            <label data-lang="paymentMethod">Payment Method</label>
+            <select id="payment-method">
+                <option value="upi">UPI</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="paypal">PayPal</option>
+            </select>
+        </div>
+        <div id="payment-fields-bank" class="control-group" style="display:none;">
+            <label data-lang="bankName">Bank Name</label><input type="text" id="bank-name">
+            <label data-lang="accName">Account Name</label><input type="text" id="acc-name">
+            <label data-lang="accNumber">Account Number</label><input type="text" id="acc-number">
+            <label data-lang="ifsc">IFSC Code</label><input type="text" id="ifsc">
+        </div>
+        <div id="payment-fields-upi" class="control-group">
+            <label data-lang="upiId">UPI ID</label><input type="text" id="upi-id">
+        </div>
+        <div id="payment-fields-paypal" class="control-group" style="display:none;">
+            <label data-lang="paypalEmail">PayPal Email</label><input type="email" id="paypal-email">
+        </div>
+        
+        <h3 data-lang="transactionDetails">Transaction Details</h3>
+        <div class="control-group">
+             <label data-lang="txnId">Transaction ID (Optional)</label><input type="text" id="txn-id">
+             <label data-lang="paymentStatus">Payment Status</label>
+             <select id="payment-status">
+                 <option value="unpaid" data-lang="statusUnpaid">Unpaid</option>
+                 <option value="paid" data-lang="statusPaid">Paid</option>
+             </select>
+        </div>
+        
+        <h3 data-lang="totalsAndNotes">Totals</h3>
+         <div class="control-group">
+             <label data-lang="discount">Discount (₹)</label><input type="number" id="discount" value="0" step="0.01">
+             <label data-lang="taxRate">Tax Rate (%)</label><input type="number" id="tax-rate" value="0.00" step="0.01">
+        </div>
+        
+        <div class="button-group">
+            <button id="download-png-btn" class="btn" data-lang="downloadPng">Download PNG</button>
+            <button id="download-pdf-btn" class="btn" data-lang="downloadPdf">Download PDF</button>
+        </div>
+        <div class="button-group">
+             <button id="download-bilingual-pdf-btn" class="btn" data-lang="downloadBilingualPdf">Download Bilingual PDF</button>
+        </div>
+    </div>
+
+    <div id="invoice-preview-container">
+        <div id="invoice-preview">
+            <div id="paid-stamp" data-lang-preview="paidStamp">PAID</div>
+            <div class="invoice-header">
+                <div class="logo-container">
+                    <img src="https://raw.githubusercontent.com/imsbg/invoice/refs/heads/main/sbgvdo.png" alt="sbgvdo logo">
+                </div>
+                <div class="invoice-title-section">
+                    <h1 class="invoice-title" data-lang-preview="invoiceTitle">INVOICE</h1>
+                    <div class="company-details">
+                        <p id="preview-your-name">sbgvdo</p>
+                        <p id="preview-your-address">City, Country</p>
+                        <p><span data-lang-preview="phone">Phone:</span> <span id="preview-your-phone"></span></p>
+                        <p><span data-lang-preview="email">Email:</span> <span id="preview-your-email"></span></p>
+                        <div id="preview-gstin-container">
+                            <p><span data-lang-preview="gstin">GSTIN:</span> <span id="preview-your-gstin"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="billing-info">
+                <div class="our-info">
+                    <h4 data-lang-preview="billTo">BILL TO</h4>
+                    <p id="preview-client-name">Client Name</p>
+                    <p id="preview-client-address">Client Address</p>
+                    <p id="preview-client-phone"></p>
+                    <p id="preview-client-email"></p>
+                </div>
+                <div class="client-info">
+                    <div class="invoice-meta">
+                        <p><span data-lang-preview="invoiceId">Invoice #</span> <span id="preview-invoice-id"></span></p>
+                        <p><span data-lang-preview="date">Date:</span> <span id="preview-invoice-date"></span></p>
+                        <p><span data-lang-preview="dueDate">Due Date:</span> <span id="preview-due-date"></span></p>
+                        <div id="preview-txn-id-container" style="display:none;">
+                            <p><span data-lang-preview="txnId">Transaction ID:</span> <span id="preview-txn-id"></span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <table class="items-table">
+                <thead><tr>
+                    <th data-lang-preview="sn">SN.</th><th data-lang-preview="item">Description</th>
+                    <th data-lang-preview="qty">Qty</th><th data-lang-preview="rate">Rate</th>
+                    <th data-lang-preview="amount">Amount</th>
+                </tr></thead>
+                <tbody id="preview-items"></tbody>
+            </table>
+
+            <div class="invoice-summary">
+                <div class="payment-terms">
+                    <div id="payment-details-preview">
+                        <h4 id="preview-payment-method-title" data-lang-preview="paymentDetails">Payment Details</h4>
+                        <div id="preview-payment-content"></div>
+                    </div>
+                    <br>
+                    <div id="terms-preview">
+                        <h4 data-lang-preview="termsConditions">Terms & Conditions</h4>
+                        <ul id="preview-terms-list"></ul>
+                    </div>
+                </div>
+
+                <div class="totals-section">
+                    <div class="total-row"><span data-lang-preview="subTotal">Sub Total</span><span id="preview-subtotal">₹0.00</span></div>
+                    <div class="total-row"><span data-lang-preview="discount">Discount</span><span id="preview-discount">₹0.00</span></div>
+                    <div class="total-row"><span><span data-lang-preview="tax">Tax</span> (<span id="preview-tax-rate">0.00</span>%)</span><span id="preview-tax-amount">₹0.00</span></div>
+                    <div class="total-row grand-total"><span data-lang-preview="grandTotal">Grand Total</span><span id="preview-grand-total">₹0.00</span></div>
+                    <div id="amount-in-words"><p><strong data-lang-preview="inWords">In Words:</strong> <span id="preview-amount-words"></span></p></div>
+                </div>
+            </div>
+
+            <div class="invoice-footer">
+                <p data-lang-preview="thankYou">Thank you!</p>
+                <p><span data-lang-preview="contactMe">Contact me:</span> <a href="https://www.instagram.com/sandeepbiswalg" target="_blank" id="preview-ig-link">@sandeepbiswalg</a></p>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- LANGUAGE & STATIC DATA ---
+    const langData = {
+        en: {
+            formTitle: "Invoice Details", yourDetails: "Your Details", yourName: "Name/Company", yourAddress: "Address", yourPhone: "Phone", yourEmail: "Email", yourGstinCheckbox: "Enable GSTIN",
+            clientDetails: "Client Details", clientName: "Name", clientAddress: "Address", clientPhone: "Phone", clientEmail: "Email",
+            invoiceDetails: "Invoice Details", invoiceId: "Invoice No", autoIncrement: "Auto-increment invoice # on new session", invoiceDate: "Date", dueDate: "Due Date",
+            items: "Items", addItem: "Add Item",
+            paymentDetails: "Payment Details", paymentMethod: "Payment Method", bankName: "Bank Name", accName: "Account Name", accNumber: "Account Number", ifsc: "IFSC Code", upiId: "UPI ID", paypalEmail: "PayPal Email",
+            transactionDetails: "Transaction Details", txnId: "Transaction ID (Optional)", paymentStatus: "Payment Status", statusUnpaid: "Unpaid", statusPaid: "Paid",
+            totalsAndNotes: "Totals", discount: "Discount (₹)", taxRate: "Tax Rate (%)",
+            downloadPng: "Download PNG", downloadPdf: "Download PDF", downloadBilingualPdf: "Download Bilingual PDF",
+            defaultItems: ["Video Editing - [Project Name]", "Color Correction & Grading", "Audio Mixing & Mastering", "Motion Graphics (e.g., Intro/Outro)", "Revisions - [Number of rounds]", "[Any Other Service]"],
+            terms: ["A small demo video will be provided before finalizing.", "Payment is required after the demo is approved.", "Final video will be delivered after full payment.", "Additional edits beyond the agreed scope may be charged extra.", "All files will be stored for 24hrs post-delivery.", "Accepted payment methods: UPI, Bank Transfer, and PayPal only.", "By making payment, the client agrees to these terms."],
+            preview: {
+                invoiceTitle: "INVOICE", phone: "Phone:", email: "Email:", gstin: "GSTIN:", billTo: "BILL TO", date: "Date:", dueDate: "Due Date:", txnId: "Transaction ID:",
+                sn: "SN.", item: "Description", qty: "Qty", rate: "Rate", amount: "Amount", subTotal: "Sub Total", tax: "Tax", grandTotal: "Grand Total", inWords: "In Words:",
+                paymentDetails: "Payment Details", termsConditions: "Terms & Conditions", thankYou: "Thank you for your business!", contactMe: "Contact me:", paidStamp: "PAID",
+                paymentMethods: { bank: "Bank Transfer Details", upi: "UPI Details", paypal: "PayPal Details" },
+                bankName: "Bank:", accName: "A/C Name:", accNumber: "A/C No:", ifsc: "IFSC:", upiId: "UPI ID:", paypalEmail: "PayPal:",
+            }
+        },
+        od: {
+            formTitle: "ବିଲ୍ ବିବରଣୀ", yourDetails: "ଆପଣଙ୍କ ବିବରଣୀ", yourName: "ନାମ/କମ୍ପାନୀ", yourAddress: "ଠିକଣା", yourPhone: "ଫୋନ୍", yourEmail: "ଇମେଲ୍", yourGstinCheckbox: "GSTIN ସକ୍ଷମ କରନ୍ତୁ",
+            clientDetails: "ଗ୍ରାହକଙ୍କ ବିବରଣୀ", clientName: "ନାମ", clientAddress: "ଠିକଣା", clientPhone: "ଫୋନ୍", clientEmail: "ଇମେଲ୍",
+            invoiceDetails: "ବିଲ୍ ବିବରଣୀ", invoiceId: "ବିଲ୍ ନଂ", autoIncrement: "ନୂଆ ସେସନରେ ବିଲ୍ # ଅଟୋ-ଇନକ୍ରିମେଣ୍ଟ କରନ୍ତୁ", invoiceDate: "ତାରିଖ", dueDate: "ଦେୟର ଶେଷ ତାରିଖ",
+            items: "ସେବାଗୁଡ଼ିକ", addItem: "ଆଇଟମ୍ ଯୋଡ଼ନ୍ତୁ",
+            paymentDetails: "ପେମେଣ୍ଟ ବିବରଣୀ", paymentMethod: "ପେମେଣ୍ଟ ପଦ୍ଧତି", bankName: "ବ୍ୟାଙ୍କ ନାମ", accName: "ଖାତାଧାରକଙ୍କ ନାମ", accNumber: "ଖାତା ନମ୍ବର", ifsc: "IFSC କୋଡ୍", upiId: "UPI ଆଇଡି", paypalEmail: "ପେପାଲ୍ ଇମେଲ୍",
+            transactionDetails: "ଟ୍ରାଞ୍ଜାକସନ ବିବରଣୀ", txnId: "ଟ୍ରାଞ୍ଜାକସନ ID (ବୈକଳ୍ପିକ)", paymentStatus: "ପେମେଣ୍ଟ ସ୍ଥିତି", statusUnpaid: "ହୋଇନାହିଁ", statusPaid: "ପୈଠ କରାଯାଇଛି",
+            totalsAndNotes: "ମୋଟ", discount: "ଛାଡ଼ (₹)", taxRate: "କର ହାର (%)",
+            downloadPng: "PNG ଡାଉନଲୋଡ୍", downloadPdf: "PDF ଡାଉନଲୋଡ୍", downloadBilingualPdf: "ଦ୍ୱିଭାଷୀ PDF ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
+            defaultItems: ["ଭିଡିଓ ଏଡିଟିଂ - [ପ୍ରୋଜେକ୍ଟ ନାମ]", "କଲର୍ କରେକ୍ସନ୍ ଓ ଗ୍ରେଡିଂ", "ଅଡିଓ ମିକ୍ସିଂ ଓ ମାଷ୍ଟରିଂ", "ମୋସନ୍ ଗ୍ରାଫିକ୍ସ (ଯଥା, Intro/Outro)", "ସଂଶୋଧନ - [ରାଉଣ୍ଡ ସଂଖ୍ୟା]", "[ଅନ୍ୟ କୌଣସି ସେବା]"],
+            terms: ["ଚୂଡ଼ାନ୍ତ କରିବା ପୂର୍ବରୁ ଏକ ଛୋଟ ଡେମୋ ଭିଡିଓ ପ୍ରଦାନ କରାଯିବ।", "ଡେମୋ ଅନୁମୋଦନ ହେବା ପରେ ପେମେଣ୍ଟ ଆବଶ୍ୟକ।", "ସମ୍ପୂର୍ଣ୍ଣ ପେମେଣ୍ଟ ପରେ ଚୂଡ଼ାନ୍ତ ଭିଡିଓ ପ୍ରଦାନ କରାଯିବ।", "ସହମତ ପରିସର ବାହାରେ ଅତିରିକ୍ତ ସମ୍ପାଦନା ପାଇଁ ଅତିରିକ୍ତ ଚାର୍ଜ ଲାଗିପାରେ।", "ଡେଲିଭରି ପରେ ସମସ୍ତ ଫାଇଲ୍ ୨୪ ଘଣ୍ଟା ପାଇଁ ସଂରକ୍ଷିତ ରହିବ।", "ଗ୍ରହଣୀୟ ପେମେଣ୍ଟ ପଦ୍ଧତି: କେବଳ UPI, ବ୍ୟାଙ୍କ ଟ୍ରାନ୍ସଫର, ଏବଂ PayPal।", "ପେମେଣ୍ଟ କରି, ଗ୍ରାହକ ଏହି ସର୍ତ୍ତାବଳୀରେ ସହମତ ଅଟନ୍ତି।"],
+            preview: {
+                invoiceTitle: "ବିଲ୍", phone: "ଫୋନ୍:", email: "ଇମେଲ୍:", gstin: "GSTIN:", billTo: "ବିଲ୍ ", date: "ତାରିଖ:", dueDate: "ଦେୟର ଶେଷ ତାରିଖ:", txnId: "ଟ୍ରାଞ୍ଜାକସନ ID:",
+                sn: "କ୍ର.ସଂ.", item: "ବିବରଣୀ", qty: "ସଂଖ୍ୟା", rate: "ଦର", amount: "ମୂଲ୍ୟ", subTotal: "ମୋଟ", discount: "ଛାଡ଼", tax: "କର", grandTotal: "ସର୍ବ ମୋଟ", inWords: "ଅକ୍ଷରରେ:",
+                paymentDetails: "ପେମେଣ୍ଟ ବିବରଣୀ", termsConditions: "ସର୍ତ୍ତାବଳୀ", thankYou: "ଧନ୍ୟବାଦ!", contactMe: "ମୋତେ ଯୋଗାଯୋଗ କରନ୍ତୁ:", paidStamp: "ପୈଠ ହୋଇଛି",
+                paymentMethods: { bank: "ବ୍ୟାଙ୍କ ଟ୍ରାନ୍ସଫର ବିବରଣୀ", upi: "UPI ବିବରଣୀ", paypal: "ପେପାଲ୍ ବିବରଣୀ" },
+                bankName: "ବ୍ୟାଙ୍କ:", accName: "ଖାତା ନାମ:", accNumber: "ଖାତା ନଂ:", ifsc: "IFSC:", upiId: "UPI ID:", paypalEmail: "ପେପାଲ୍:",
+            }
+        }
+    };
+    let currentLang = 'en';
+
+    // --- LANGUAGE TOGGLE FUNCTIONALITY ---
+    const langToggleBtn = document.getElementById('lang-toggle-btn');
+    langToggleBtn.addEventListener('click', () => {
+        forceLanguageChange(currentLang === 'en' ? 'od' : 'en');
+    });
+
+    function forceLanguageChange(lang) {
+        currentLang = lang;
+        langToggleBtn.textContent = currentLang === 'en' ? 'Odia' : 'English';
+        updateLanguage();
+    }
+
+    function updateLanguage() {
+        const lang = langData[currentLang];
+        document.querySelectorAll('[data-lang]').forEach(el => {
+            el.textContent = lang[el.getAttribute('data-lang')] || el.textContent;
+        });
+        document.querySelectorAll('[data-lang-preview]').forEach(el => {
+            const key = el.getAttribute('data-lang-preview');
+            el.textContent = lang.preview[key] || el.textContent;
+        });
+        const termsList = document.getElementById('preview-terms-list');
+        termsList.innerHTML = '';
+        lang.terms.forEach(term => {
+            const li = document.createElement('li');
+            li.textContent = term;
+            termsList.appendChild(li);
+        });
+        updatePreview();
+    }
+
+    // --- EVENT LISTENERS ---
+    document.querySelectorAll('.controls input, .controls select, .controls textarea').forEach(input => {
+        input.addEventListener('input', updatePreview);
+    });
+    
+    document.getElementById('enable-gstin').addEventListener('change', (e) => {
+        document.getElementById('your-gstin').disabled = !e.target.checked;
+        updatePreview();
+    });
+    
+    document.getElementById('payment-method').addEventListener('change', handlePaymentMethodChange);
+    
+    document.getElementById('invoice-id').addEventListener('input', (e) => {
+        localStorage.setItem('invoiceNumber', e.target.value);
+    });
+    
+    document.getElementById('auto-increment-inv').addEventListener('change', (e) => {
+        localStorage.setItem('autoIncrementEnabled', e.target.checked);
+    });
+    
+    const addItemBtn = document.getElementById('add-item-btn');
+    addItemBtn.addEventListener('click', () => createNewItemRow());
+
+    // --- CORE FUNCTIONS ---
+    function handlePaymentMethodChange() {
+        const selectedMethod = document.getElementById('payment-method').value;
+        document.getElementById('payment-fields-bank').style.display = 'none';
+        document.getElementById('payment-fields-upi').style.display = 'none';
+        document.getElementById('payment-fields-paypal').style.display = 'none';
+        document.getElementById(`payment-fields-${selectedMethod}`).style.display = 'block';
+        updatePreview();
+    }
+
+    function createNewItemRow(description = '', qty = 1, price = 0) {
+        const row = document.createElement('div');
+        row.classList.add('item-row');
+        row.innerHTML = `
+            <input type="text" class="item-desc" placeholder="Item description" value="${description}">
+            <input type="number" class="item-qty" value="${qty}" min="1">
+            <input type="number" class="item-price" value="${price.toFixed(2)}" step="0.01">
+            <button class="remove-item-btn" onclick="removeItem(this)">-</button>
+        `;
+        document.getElementById('items-container').appendChild(row);
+        row.querySelectorAll('input').forEach(input => input.addEventListener('input', updatePreview));
+    }
+    
+    window.removeItem = (button) => {
+        button.parentElement.remove();
+        updatePreview();
+    };
+
+    function updatePreview() {
+        // --- Update Text Fields ---
+        const fields = ['your-name','your-address','your-phone','your-email','your-gstin','client-name','client-address','client-phone','client-email','invoice-id','txn-id'];
+        fields.forEach(id => {
+            const el = document.getElementById(`preview-${id}`);
+            if (el) el.innerText = document.getElementById(id).value;
+        });
+
+        // --- Dates ---
+        const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('en-GB') : '';
+        document.getElementById('preview-invoice-date').innerText = formatDate(document.getElementById('invoice-date').value);
+        document.getElementById('preview-due-date').innerText = formatDate(document.getElementById('due-date').value);
+        
+        // --- Conditional Visibility ---
+        document.getElementById('preview-gstin-container').style.display = document.getElementById('enable-gstin').checked ? 'block' : 'none';
+        const txnId = document.getElementById('txn-id').value;
+        document.getElementById('preview-txn-id-container').style.display = txnId ? 'block' : 'none';
+        document.getElementById('paid-stamp').style.display = document.getElementById('payment-status').value === 'paid' ? 'block' : 'none';
+
+        // --- Items & Totals ---
+        let subtotal = 0;
+        const previewItemsContainer = document.getElementById('preview-items');
+        previewItemsContainer.innerHTML = '';
+        document.querySelectorAll('#items-container .item-row').forEach((row, index) => {
+            const desc = row.querySelector('.item-desc').value;
+            const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+            const price = parseFloat(row.querySelector('.item-price').value) || 0;
+            const total = qty * price;
+            subtotal += total;
+            const previewRow = document.createElement('tr');
+            previewRow.innerHTML = `<td>${index + 1}</td><td>${desc}</td><td>${qty}</td><td>₹${price.toFixed(2)}</td><td>₹${total.toFixed(2)}</td>`;
+            previewItemsContainer.appendChild(previewRow);
+        });
+
+        const discount = parseFloat(document.getElementById('discount').value) || 0;
+        const subtotalAfterDiscount = subtotal - discount;
+        const taxRate = parseFloat(document.getElementById('tax-rate').value) || 0;
+        const taxAmount = subtotalAfterDiscount * (taxRate / 100);
+        const grandTotal = subtotalAfterDiscount + taxAmount;
+        
+        document.getElementById('preview-subtotal').innerText = `₹${subtotal.toFixed(2)}`;
+        document.getElementById('preview-discount').innerText = `-₹${discount.toFixed(2)}`;
+        document.getElementById('preview-tax-rate').innerText = taxRate.toFixed(2);
+        document.getElementById('preview-tax-amount').innerText = `₹${taxAmount.toFixed(2)}`;
+        document.getElementById('preview-grand-total').innerText = `₹${grandTotal.toFixed(2)}`;
+        document.getElementById('preview-amount-words').innerText = numberToWords(grandTotal, currentLang);
+        
+        // --- Payment Details ---
+        const paymentPreview = document.getElementById('preview-payment-content');
+        const method = document.getElementById('payment-method').value;
+        const langPreview = langData[currentLang].preview;
+        document.getElementById('preview-payment-method-title').innerText = langPreview.paymentMethods[method];
+        paymentPreview.innerHTML = '';
+        if (method === 'bank') {
+            paymentPreview.innerHTML = `
+                <p><strong>${langPreview.bankName}</strong> <span id="preview-bank-name">${document.getElementById('bank-name').value}</span></p>
+                <p><strong>${langPreview.accName}</strong> <span id="preview-acc-name">${document.getElementById('acc-name').value}</span></p>
+                <p><strong>${langPreview.accNumber}</strong> <span id="preview-acc-number">${document.getElementById('acc-number').value}</span></p>
+                <p><strong>${langPreview.ifsc}</strong> <span id="preview-ifsc">${document.getElementById('ifsc').value}</span></p>
+            `;
+        } else if (method === 'upi') {
+            paymentPreview.innerHTML = `<p><strong>${langPreview.upiId}</strong> <span id="preview-upi-id">${document.getElementById('upi-id').value}</span></p>`;
+        } else if (method === 'paypal') {
+            paymentPreview.innerHTML = `<p><strong>${langPreview.paypalEmail}</strong> <span id="preview-paypal-email">${document.getElementById('paypal-email').value}</span></p>`;
+        }
+    }
+    
+    // --- UTILITY: NUMBER TO WORDS ---
+    function numberToWords(num, lang) {
+        const a_en = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
+        const b_en = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
+        const a_od = ['','ଏକ ','ଦୁଇ ','ତିନି ','ଚାରି ','ପାଞ୍ଚ ','ଛଅ ','ସାତ ','ଆଠ ','ନଅ ','ଦଶ ','ଏଗାର ','ବାର ','ତେର ','ଚଉଦ ','ପନ୍ଦର ','ଷୋହଳ ','ସତର ','ଅଠର ','ଊଣେଇଶ '];
+        const b_od = ['', '', 'କୋଡ଼ିଏ ','ତିରିଶ ','ଚାଳିଶ ','ପଚାଶ ','ଷାଠିଏ ','ସତୁରି ','ଅଶୀ ','ନବେ '];
+        
+        const toWords = (n, s, units, tens) => {
+            let str = '';
+            if (n > 19) str += tens[Math.floor(n/10)] + units[n%10]; else str += units[n];
+            if (n != 0) str += s;
+            return str;
+        }
+
+        let str = '';
+        if (lang === 'od') {
+            str += toWords(Math.floor(num/10000000), 'କୋଟି ', a_od, b_od);
+            str += toWords(Math.floor((num/100000)%100), 'ଲକ୍ଷ ', a_od, b_od);
+            str += toWords(Math.floor((num/1000)%100), 'ହଜାର ', a_od, b_od);
+            str += toWords(Math.floor((num/100)%10), 'ଶହ ', a_od, b_od);
+            str += toWords(num%100, '', a_od, b_od);
+            return str.trim() ? str.trim() + ' ଟଙ୍କା ମାତ୍ର' : 'ଶୂନ ଟଙ୍କା ମାତ୍ର';
+        } else {
+            str += toWords(Math.floor(num/10000000), 'crore ', a_en, b_en);
+            str += toWords(Math.floor((num/100000)%100), 'lakh ', a_en, b_en);
+            str += toWords(Math.floor((num/1000)%100), 'thousand ', a_en, b_en);
+            str += toWords(Math.floor((num/100)%10), 'hundred ', a_en, b_en);
+            if (num > 100 && num % 100 > 0) str += 'and ';
+            str += toWords(num%100, '', a_en, b_en);
+            return str.trim() ? str.trim() + ' Rupees Only' : 'Zero Rupees Only';
+        }
+    }
+
+    // --- DOWNLOAD FUNCTIONALITY ---
+    const invoicePreviewEl = document.getElementById('invoice-preview');
+    document.getElementById('download-png-btn').addEventListener('click', () => {
+        html2canvas(invoicePreviewEl, { scale: 3, useCORS: true }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `invoice-${document.getElementById('invoice-id').value || 'new'}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    });
+
+    document.getElementById('download-pdf-btn').addEventListener('click', () => {
+        const { jsPDF } = window.jspdf;
+        html2canvas(invoicePreviewEl, { scale: 3, useCORS: true }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'p', unit: 'px', format: [canvas.width, canvas.height] });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            const linkEl = document.getElementById('preview-ig-link');
+            const rect = linkEl.getBoundingClientRect();
+            const previewRect = invoicePreviewEl.getBoundingClientRect();
+            const scale = canvas.width / previewRect.width;
+            pdf.link((rect.left-previewRect.left)*scale, (rect.top-previewRect.top)*scale, rect.width*scale, rect.height*scale, { url: 'https://www.instagram.com/sandeepbiswalg' });
+            pdf.save(`invoice-${document.getElementById('invoice-id').value || 'new'}.pdf`);
+        });
+    });
+
+    // --- NEW BILINGUAL PDF DOWNLOAD ---
+    document.getElementById('download-bilingual-pdf-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('download-bilingual-pdf-btn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Generating...';
+        btn.disabled = true;
+
+        const originalLang = currentLang;
+        const { jsPDF } = window.jspdf;
+        let pdf;
+        let canvasHeight, canvasWidth;
+        
+        // 1. Generate English version
+        forceLanguageChange('en');
+        await new Promise(resolve => setTimeout(resolve, 100)); // allow DOM to update
+        const canvasEn = await html2canvas(invoicePreviewEl, { scale: 3, useCORS: true });
+        const imgDataEn = canvasEn.toDataURL('image/png');
+        canvasHeight = canvasEn.height;
+        canvasWidth = canvasEn.width;
+        pdf = new jsPDF({ orientation: 'p', unit: 'px', format: [canvasWidth, canvasHeight] });
+        pdf.addImage(imgDataEn, 'PNG', 0, 0, canvasWidth, canvasHeight);
+        
+        // 2. Generate Odia version
+        forceLanguageChange('od');
+        await new Promise(resolve => setTimeout(resolve, 100)); // allow DOM to update
+        const canvasOd = await html2canvas(invoicePreviewEl, { scale: 3, useCORS: true });
+        const imgDataOd = canvasOd.toDataURL('image/png');
+        pdf.addPage([canvasWidth, canvasHeight], 'p');
+        pdf.addImage(imgDataOd, 'PNG', 0, 0, canvasWidth, canvasHeight);
+        
+        // 3. Add clickable link to both pages
+        const linkEl = document.getElementById('preview-ig-link');
+        const rect = linkEl.getBoundingClientRect();
+        const previewRect = invoicePreviewEl.getBoundingClientRect();
+        const scale = canvasWidth / previewRect.width;
+        const linkX = (rect.left - previewRect.left) * scale;
+        const linkY = (rect.top - previewRect.top) * scale;
+        const linkW = rect.width * scale;
+        const linkH = rect.height * scale;
+
+        pdf.setPage(1);
+        pdf.link(linkX, linkY, linkW, linkH, { url: 'https://www.instagram.com/sandeepbiswalg' });
+        pdf.setPage(2);
+        pdf.link(linkX, linkY, linkW, linkH, { url: 'https://www.instagram.com/sandeepbiswalg' });
+
+        // 4. Save the PDF
+        pdf.save(`invoice-enod-${document.getElementById('invoice-id').value || 'new'}.pdf`);
+        
+        // 5. Restore original state
+        forceLanguageChange(originalLang);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    });
+
+    // --- INITIALIZATION ---
+    function init() {
+        // --- Dates ---
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('invoice-date').value = today;
+        document.getElementById('due-date').value = today;
+
+        // --- Local Storage for Invoice ID ---
+        let lastInvNum = localStorage.getItem('invoiceNumber') || '001';
+        const autoIncrement = localStorage.getItem('autoIncrementEnabled') === 'true';
+        document.getElementById('auto-increment-inv').checked = autoIncrement;
+        if (autoIncrement && sessionStorage.getItem('sessionStarted') === null) {
+            if (!isNaN(parseInt(lastInvNum))) {
+                const num = parseInt(lastInvNum) + 1;
+                lastInvNum = String(num).padStart(lastInvNum.length, '0');
+            }
+            localStorage.setItem('invoiceNumber', lastInvNum);
+            sessionStorage.setItem('sessionStarted', 'true');
+        }
+        document.getElementById('invoice-id').value = lastInvNum;
+        
+        
+        // --- Default Items ---
+        langData.en.defaultItems.forEach(itemText => createNewItemRow(itemText, 1, 0));
+        
+        handlePaymentMethodChange();
+        updateLanguage();
+    }
+    
+    window.addEventListener('load', init);
+
+</script>
+</body>
+</html>
